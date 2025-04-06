@@ -1,0 +1,65 @@
+{
+  "database": {
+    "host": "pg-d1eb94-nicoliberatoc-6e5f.c.aivencloud.com",
+    "port": 20994,
+    "dbname": "defaultdb",
+    "user": "avnadmin",
+    "password": "AVNS_ofbHnnXOF6uuQL-wlTz",
+    "sslmode": "require"
+  },
+  "websites": [
+    {
+      "url": "https://www.google.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Google"
+    },
+    {
+      "url": "https://www.github.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "GitHub"
+    },
+    {
+      "url": "https://www.wikipedia.org",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Wikipedia"
+    },
+    {
+      "url": "https://www.cnn.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "CNN"
+    },
+    {
+      "url": "https://www.reddit.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Reddit"
+    },
+    {
+      "url": "https://www.amazon.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Amazon"
+    },
+    {
+      "url": "https://www.bbc.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "BBC"
+    },
+    {
+      "url": "https://www.netflix.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Netflix"
+    },
+    {
+      "url": "https://www.weather.gov",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Weather"
+    },
+    {
+      "url": "https://www.nytimes.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "New York Times"
+    }
+  ],
+  "max_workers": 10,
+  "retry_limit": 3,
+  "connection_timeout": 10
+}
