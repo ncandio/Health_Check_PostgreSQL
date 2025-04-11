@@ -3,11 +3,11 @@ Custom scheduler implementation for website monitoring.
 Handles concurrent execution of monitoring tasks with different intervals.
 """
 
+import heapq
 import logging
 import threading
 import time
-from typing import Dict, List, Callable, Any, Optional
-import heapq
+from typing import Any, Callable, Dict, List, Optional
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -143,7 +143,7 @@ class Scheduler:
                             task.next_run = now + 1
                             heapq.heappush(self.tasks, task)
                             continue
-                        
+
                         # Schedule next execution
                         task.next_run = now + task.interval
                         heapq.heappush(self.tasks, task)
@@ -176,7 +176,7 @@ class Scheduler:
             )
             self.scheduler_thread.start()
             logger.info("Scheduler started")
-            
+
             # Give the scheduler a moment to fully initialize
             time.sleep(0.5)
 
@@ -192,7 +192,7 @@ class Scheduler:
     def is_running(self) -> bool:
         """Check if the scheduler is running."""
         return self.running
-        
+
     def get_task_info(self, task_id: int) -> Optional[Dict]:
         """Get information about a task.
 
@@ -206,19 +206,25 @@ class Scheduler:
             if task_id in self.task_map:
                 task = self.task_map[task_id]
                 return {
-                    'task_id': task.task_id,
-                    'interval': task.interval,
-                    'next_run': task.next_run,
-                    'next_run_time': time.strftime('%Y-%m-%d %H:%M:%S', 
-                                               time.localtime(task.next_run)),
-                    'last_run': task.last_run,
-                    'last_run_time': time.strftime('%Y-%m-%d %H:%M:%S', 
-                                               time.localtime(task.last_run)) if task.last_run else None,
-                    'is_running': task.is_running,
-                    'error_count': task.error_count
+                    "task_id": task.task_id,
+                    "interval": task.interval,
+                    "next_run": task.next_run,
+                    "next_run_time": time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(task.next_run)
+                    ),
+                    "last_run": task.last_run,
+                    "last_run_time": (
+                        time.strftime(
+                            "%Y-%m-%d %H:%M:%S", time.localtime(task.last_run)
+                        )
+                        if task.last_run
+                        else None
+                    ),
+                    "is_running": task.is_running,
+                    "error_count": task.error_count,
                 }
             return None
-            
+
     def list_tasks(self) -> List[Dict]:
         """List all tasks and their status.
 
@@ -228,23 +234,31 @@ class Scheduler:
         result = []
         with self.tasks_lock:
             for task_id, task in self.task_map.items():
-                result.append({
-                    'task_id': task.task_id,
-                    'interval': task.interval,
-                    'next_run': task.next_run,
-                    'next_run_time': time.strftime('%Y-%m-%d %H:%M:%S', 
-                                                time.localtime(task.next_run)),
-                    'last_run': task.last_run,
-                    'last_run_time': time.strftime('%Y-%m-%d %H:%M:%S', 
-                                                time.localtime(task.last_run)) if task.last_run else None,
-                    'is_running': task.is_running,
-                    'error_count': task.error_count
-                })
+                result.append(
+                    {
+                        "task_id": task.task_id,
+                        "interval": task.interval,
+                        "next_run": task.next_run,
+                        "next_run_time": time.strftime(
+                            "%Y-%m-%d %H:%M:%S", time.localtime(task.next_run)
+                        ),
+                        "last_run": task.last_run,
+                        "last_run_time": (
+                            time.strftime(
+                                "%Y-%m-%d %H:%M:%S", time.localtime(task.last_run)
+                            )
+                            if task.last_run
+                            else None
+                        ),
+                        "is_running": task.is_running,
+                        "error_count": task.error_count,
+                    }
+                )
         return result
-        
+
     def get_dask_status(self) -> Dict:
         """Get status information about the scheduler.
-        
+
         Returns:
             Dictionary with status information
         """
@@ -252,5 +266,5 @@ class Scheduler:
             "status": "running" if self.running else "stopped",
             "workers": self.workers_semaphore._value,
             "tasks_pending": len([t for t in self.task_map.values() if t.is_running]),
-            "tasks_total": len(self.task_map)
+            "tasks_total": len(self.task_map),
         }

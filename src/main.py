@@ -4,13 +4,19 @@ Main entry point for the website monitor application.
 
 import json
 import logging
+import os
 import signal
 import sys
 import time
-from typing import Dict, List, Any
+from datetime import datetime
+from typing import Any, Dict, List
+
+# Add the parent directory to the path so we can import from src
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.database import DatabaseManager
-from src.monitor import WebsiteMonitor
+# Ensure monitor.py logging is initialized first
+from src.monitor import WebsiteMonitor, root_logger
 from src.scheduler import Scheduler
 from src.validators import validate_website_config
 
@@ -18,21 +24,20 @@ from src.validators import validate_website_config
 # But we'll configure a specialized logger for this module with real-time monitoring focus
 # We'll focus on emphasizing website monitoring, not internal details
 
-import os
-from datetime import datetime
-
-# Ensure monitor.py logging is initialized first
-from src.monitor import root_logger
 
 # Create special file just for main application events
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
-main_log_file = os.path.join(log_dir, f'application_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+log_dir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
+)
+main_log_file = os.path.join(
+    log_dir, f'application_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+)
 
 # Create a separate file handler for main application events with timestamp in filename
 main_file_handler = logging.FileHandler(main_log_file)
-main_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-))
+main_file_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
 main_file_handler.setLevel(logging.INFO)
 
 # Get module logger and add the special handler
@@ -43,7 +48,9 @@ logger.addHandler(main_file_handler)
 print(f"\033[97;46m{'='*80}\033[0m")
 print(f"\033[97;46m WEBSITE MONITORING SYSTEM STARTING \033[0m")
 print(f"\033[97;46m Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} \033[0m")
-print(f"\033[97;46m Python: {sys.version.split()[0]} | Host: {os.uname().nodename} \033[0m")
+print(
+    f"\033[97;46m Python: {sys.version.split()[0]} | Host: {os.uname().nodename} \033[0m"
+)
 print(f"\033[97;46m{'='*80}\033[0m")
 
 
@@ -103,6 +110,13 @@ def monitor_website(
         result = monitor.check_website(url, regex_pattern)
 
         # Store result in database
+        content_size_bytes = None
+        dns_lookup_time_ms = None
+
+        if "check_details" in result:
+            content_size_bytes = result["check_details"].get("content_size_bytes")
+            dns_lookup_time_ms = result["check_details"].get("dns_lookup_time_ms")
+
         result_id = db_manager.store_monitoring_result(
             website_id=website_id,
             response_time_ms=result["response_time_ms"],
@@ -110,8 +124,11 @@ def monitor_website(
             success=result["success"],
             regex_matched=result["regex_matched"],
             failure_reason=result["failure_reason"],
+            check_details=result.get("check_details", {}),
+            content_size_bytes=content_size_bytes,
+            dns_lookup_time_ms=dns_lookup_time_ms,
         )
-        
+
         if result_id is None:
             logger.warning(f"Failed to store successful monitoring result for {url}")
     except Exception as e:
@@ -125,8 +142,14 @@ def monitor_website(
                 success=False,
                 regex_matched=None,
                 failure_reason=f"Internal error: {str(e)}",
+                check_details={
+                    "exception_type": e.__class__.__name__,
+                    "error_message": str(e),
+                },
+                content_size_bytes=None,
+                dns_lookup_time_ms=None,
             )
-            
+
             if result_id is None:
                 logger.warning(f"Failed to store failure information for {url}")
         except Exception as db_error:
@@ -183,7 +206,9 @@ def configure_websites(
 
             configured_count += 1
             # Use bright green color ANSI escape sequence with white background and black text for better visibility
-            print(f"\033[97;42m WEBSITE CONFIGURED \033[0m \033[1;92m{website_config['url']}\033[0m")
+            print(
+                f"\033[97;42m WEBSITE CONFIGURED \033[0m \033[1;92m{website_config['url']}\033[0m"
+            )
         except Exception as e:
             logger.error(f"Failed to configure website {website_config['url']}: {e}")
 
@@ -236,7 +261,9 @@ def main():
 
     # Configure websites
     configured_count = configure_websites(config, db_manager, monitor, scheduler)
-    print(f"\033[97;44m MONITOR STATUS \033[0m \033[1;96mConfigured {configured_count} websites\033[0m")
+    print(
+        f"\033[97;44m MONITOR STATUS \033[0m \033[1;96mConfigured {configured_count} websites\033[0m"
+    )
 
     # Keep the main thread alive
     try:

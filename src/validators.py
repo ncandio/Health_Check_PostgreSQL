@@ -2,9 +2,9 @@
 Validation functions for website monitor configuration.
 """
 
-import re
 import logging
-from typing import Dict, List, Any, Optional
+import re
+from typing import Any, Dict, List, Optional
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
