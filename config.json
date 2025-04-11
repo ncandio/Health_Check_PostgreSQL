@@ -14,24 +14,14 @@
       "regex_pattern": "Google"
     },
     {
-      "url": "https://www.github.com",
+      "url": "https://www.youtube.com",
       "check_interval_seconds": 60,
-      "regex_pattern": "GitHub"
+      "regex_pattern": "YouTube"
     },
     {
-      "url": "https://www.wikipedia.org",
+      "url": "https://www.facebook.com",
       "check_interval_seconds": 60,
-      "regex_pattern": "Wikipedia"
-    },
-    {
-      "url": "https://www.cnn.com",
-      "check_interval_seconds": 60,
-      "regex_pattern": "CNN"
-    },
-    {
-      "url": "https://www.reddit.com",
-      "check_interval_seconds": 60,
-      "regex_pattern": "Reddit"
+      "regex_pattern": "Facebook"
     },
     {
       "url": "https://www.amazon.com",
@@ -39,9 +29,24 @@
       "regex_pattern": "Amazon"
     },
     {
-      "url": "https://www.bbc.com",
+      "url": "https://www.wikipedia.org",
       "check_interval_seconds": 60,
-      "regex_pattern": "BBC"
+      "regex_pattern": "Wikipedia"
+    },
+    {
+      "url": "https://www.twitter.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Twitter"
+    },
+    {
+      "url": "https://www.instagram.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Instagram"
+    },
+    {
+      "url": "https://www.linkedin.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "LinkedIn"
     },
     {
       "url": "https://www.netflix.com",
@@ -49,14 +54,209 @@
       "regex_pattern": "Netflix"
     },
     {
-      "url": "https://www.weather.gov",
+      "url": "https://www.microsoft.com",
       "check_interval_seconds": 60,
-      "regex_pattern": "Weather"
+      "regex_pattern": "Microsoft"
+    },
+    {
+      "url": "https://www.apple.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Apple"
+    },
+    {
+      "url": "https://www.github.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "GitHub"
+    },
+    {
+      "url": "https://www.reddit.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Reddit"
+    },
+    {
+      "url": "https://www.twitch.tv",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Twitch"
+    },
+    {
+      "url": "https://www.ebay.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "eBay"
     },
     {
       "url": "https://www.nytimes.com",
       "check_interval_seconds": 60,
-      "regex_pattern": "New York Times"
+      "regex_pattern": "New\\s+York\\s+Times"
+    },
+    {
+      "url": "https://www.cnn.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "CNN"
+    },
+    {
+      "url": "https://www.bbc.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "BBC"
+    },
+    {
+      "url": "https://www.wsj.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Wall\\s+Street\\s+Journal"
+    },
+    {
+      "url": "https://www.espn.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "ESPN"
+    },
+    {
+      "url": "https://www.yahoo.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Yahoo"
+    },
+    {
+      "url": "https://www.bing.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Bing"
+    },
+    {
+      "url": "https://www.pinterest.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Pinterest"
+    },
+    {
+      "url": "https://www.whatsapp.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "WhatsApp"
+    },
+    {
+      "url": "https://www.zoom.us",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Zoom"
+    },
+    {
+      "url": "https://www.spotify.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Spotify"
+    },
+    {
+      "url": "https://www.paypal.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "PayPal"
+    },
+    {
+      "url": "https://www.quora.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Quora"
+    },
+    {
+      "url": "https://www.medium.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Medium"
+    },
+    {
+      "url": "https://www.walmart.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Walmart"
+    },
+    {
+      "url": "https://www.indeed.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Indeed"
+    },
+    {
+      "url": "https://www.imdb.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "IMDb"
+    },
+    {
+      "url": "https://www.tumblr.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Tumblr"
+    },
+    {
+      "url": "https://www.craigslist.org",
+      "check_interval_seconds": 60,
+      "regex_pattern": "craigslist"
+    },
+    {
+      "url": "https://www.adobe.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Adobe"
+    },
+    {
+      "url": "https://www.salesforce.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Salesforce"
+    },
+    {
+      "url": "https://www.dropbox.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Dropbox"
+    },
+    {
+      "url": "https://www.stackoverflow.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Stack\\s*Overflow"
+    },
+    {
+      "url": "https://www.wordpress.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "WordPress"
+    },
+    {
+      "url": "https://www.vimeo.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Vimeo"
+    },
+    {
+      "url": "https://www.nike.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Nike"
+    },
+    {
+      "url": "https://www.target.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Target"
+    },
+    {
+      "url": "https://www.booking.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Booking"
+    },
+    {
+      "url": "https://www.airbnb.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Airbnb"
+    },
+    {
+      "url": "https://www.hulu.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Hulu"
+    },
+    {
+      "url": "https://www.etsy.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Etsy"
+    },
+    {
+      "url": "https://www.tiktok.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "TikTok"
+    },
+    {
+      "url": "https://www.snapchat.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Snapchat"
+    },
+    {
+      "url": "https://www.telegram.org",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Telegram"
+    },
+    {
+      "url": "https://www.discord.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Discord"
     }
   ],
   "max_workers": 10,
