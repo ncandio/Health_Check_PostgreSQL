@@ -28,10 +28,12 @@ The application consists of several modular components:
 
 ## Implementation Notes
 
-- The scheduler uses a simple thread-based implementation for maximum reliability
-  - A previous implementation using Dask is preserved in `scheduler.py.bck2`
-- Configuration supports 10 websites with regex pattern matching
-- Tests are provided for the scheduler component using pytest
+- Multiple processing and threading approaches are provided:
+  - The current implementation uses a simple thread-based scheduler for maximum reliability
+  - An alternative implementation using Dask is preserved in `scheduler.py.bck2`
+  - A third approach using pyuv for event-based processing is available
+- Configuration supports 1000 websites with regex pattern matching
+- Comprehensive test suite for scheduler, database, and website monitoring
 - Connects to an Aiven PostgreSQL database (configured in config.json)
 
 ## Configuration
@@ -43,10 +45,24 @@ The `config.json` file includes:
 
 ## Testing
 
-Unit tests focus on the scheduler component:
-```
-python -m pytest test/test_scheduler.py
-```
+The testing suite includes:
+
+1. **Scheduler Tests**: Validates the custom thread-based scheduling system
+   ```
+   python -m pytest test/test_scheduler.py
+   ```
+
+2. **Database Tests**: Verifies database connection and table creation functionality
+   ```
+   python -m pytest test/test_database.py
+   ```
+
+3. **Website Monitoring Tests**: Tests the system with 500 different websites
+   ```
+   python -m pytest test/test_500_websites.py
+   ```
+
+The system has been configured to handle up to 1000 websites in the original configuration file.
 
 ## Requirements
 
