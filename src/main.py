@@ -250,8 +250,19 @@ def main():
         retry_limit=config.get("retry_limit", 3),
     )
 
-    # Create scheduler
-    scheduler = Scheduler(max_workers=config.get("max_workers", 10))
+    # Create scheduler with Dask support
+    use_dask = config.get("use_dask", False)
+    scheduler = Scheduler(
+        max_workers=config.get("max_workers", 10),
+        use_dask=use_dask
+    )
+    
+    if use_dask:
+        logger.info("Using Dask for distributed task execution")
+        print(f"\033[97;45m SCHEDULER MODE \033[0m \033[1;95mDask distributed execution with {config.get('max_workers', 10)} workers\033[0m")
+    else:
+        logger.info("Using thread-based task execution")
+        print(f"\033[97;44m SCHEDULER MODE \033[0m \033[1;96mThread-based execution with {config.get('max_workers', 10)} workers\033[0m")
 
     # Set up signal handlers
     setup_signal_handlers(scheduler, db_manager)
