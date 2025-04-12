@@ -261,5 +261,6 @@
   ],
   "max_workers": 10,
   "retry_limit": 3,
-  "connection_timeout": 10
+  "connection_timeout": 10,
+  "use_dask": true
 }

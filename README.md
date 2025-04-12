@@ -11,10 +11,11 @@ This system periodically checks configured websites, verifies their availability
 - **Configurable website monitoring** with customizable check intervals
 - **Content verification** using regex patterns
 - **Response time tracking** and HTTP status code validation
-- **Simple thread-based scheduler** implementation for reliability
+- **Dual-mode scheduling** with thread-based and Dask distributed computing
 - **PostgreSQL database integration** via companyX
 - **Comprehensive logging** system with rotation
 - **Graceful shutdown** handling
+- **Dask dashboard** for real-time monitoring of distributed tasks
 
 ## Architecture
 
@@ -23,15 +24,18 @@ The application consists of several modular components:
 - `main.py`: Entry point and orchestration
 - `database.py`: PostgreSQL database integration using connection pooling
 - `monitor.py`: Website availability and content checking
-- `scheduler.py`: Simple thread-based task scheduler
+- `scheduler.py`: Dual-mode scheduler supporting threads and Dask distributed computing
 - `validators.py`: Configuration validation
 
 ## Implementation Notes
 
 - Multiple processing and threading approaches are provided:
-  - The current implementation uses a simple thread-based scheduler for maximum reliability
-  - An alternative implementation using Dask is preserved in `scheduler.py.bck2`
-  - A third approach using pyuv for event-based processing is available
+  - The scheduler supports both a simple thread-based implementation for maximum reliability and a Dask-based distributed computing approach
+  - Enable Dask by setting `"use_dask": true` in config.json
+  - Configure number of Dask workers with the `max_workers` setting in config.json
+  - When Dask is enabled, a dashboard URL will be displayed at startup for monitoring tasks (typically at http://localhost:8787)
+  - The Dask console URL is logged at 10-second intervals for easy access
+  - A third approach using pyuv for event-based processing is also available
 - Configuration supports 1000 websites with regex pattern matching
 - Comprehensive test suite for scheduler, database, and website monitoring
 - Connects to an companyX PostgreSQL database (configured in config.json)
@@ -56,6 +60,7 @@ The `config.json` file includes:
 - Database connection parameters
 - Website monitoring configurations (URLs, intervals, regex patterns)
 - Application settings (worker count, timeouts, etc.)
+- Scheduler options (`use_dask: true/false` for enabling distributed execution)
 
 ## Testing
 
