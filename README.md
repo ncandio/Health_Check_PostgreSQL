@@ -36,6 +36,20 @@ The application consists of several modular components:
 - Comprehensive test suite for scheduler, database, and website monitoring
 - Connects to an Aiven PostgreSQL database (configured in config.json)
 
+## Running the Application
+
+To launch the application:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python src/main.py
+```
+
+
+
 ## Configuration
 
 The `config.json` file includes:
