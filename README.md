@@ -6,6 +6,8 @@ A robust Python application for monitoring website availability and content veri
 
 This system periodically checks configured websites, verifies their availability, and optionally validates content using regex patterns. It stores all monitoring results in a PostgreSQL database for historical tracking and analysis.
 
+> **IMPORTANT**: This branch with Dask integration is EXPERIMENTAL and for RESEARCH purposes only. The Dask implementation ([https://docs.dask.org/en/stable/index.html](https://docs.dask.org/en/stable/index.html)) provides distributed computing capabilities, but is not recommended for production use in this version.
+
 ## Features
 
 - **Configurable website monitoring** with customizable check intervals
@@ -34,7 +36,7 @@ The application consists of several modular components:
   - Enable Dask by setting `"use_dask": true` in config.json
   - Configure number of Dask workers with the `max_workers` setting in config.json
   - When Dask is enabled, a dashboard URL will be displayed at startup for monitoring tasks (typically at http://localhost:8787)
-  - The Dask console URL is logged at 10-second intervals for easy access
+  - The Dask console is available at http://localhost:8787 and the URL is logged at 10-second intervals for easy access
   - A third approach using pyuv for event-based processing is also available
 - Configuration supports 1000 websites with regex pattern matching
 - Comprehensive test suite for scheduler, database, and website monitoring
