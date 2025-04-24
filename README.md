@@ -38,7 +38,24 @@ The application consists of several modular components:
 
 ## Running the Application
 
-To launch the application:
+### Setting up a Virtual Environment
+
+It's recommended to use a virtual environment to isolate the project dependencies:
+
+```bash
+# Create a virtual environment
+python -m venv venv
+
+# Activate the virtual environment (Linux/Mac)
+source venv/bin/activate
+
+# Activate the virtual environment (Windows)
+venv\Scripts\activate
+```
+
+### Installing Dependencies and Running
+
+Once the virtual environment is activated:
 
 ```bash
 # Install dependencies
@@ -48,6 +65,11 @@ pip install -r requirements.txt
 python src/main.py
 ```
 
+To deactivate the virtual environment when finished:
+
+```bash
+deactivate
+```
 
 
 ## Configuration
