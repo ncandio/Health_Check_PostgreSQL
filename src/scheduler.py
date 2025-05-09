@@ -1,6 +1,7 @@
 """
 Custom scheduler implementation for website monitoring.
 Handles concurrent execution of monitoring tasks with different intervals.
+Supports both a thread-based scheduler and Dask distributed computing.
 """
 
 import heapq
@@ -8,6 +9,14 @@ import logging
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
+
+# Import Dask components for distributed computing
+try:
+    import dask
+    from distributed import Client, Future
+    DASK_AVAILABLE = True
+except ImportError:
+    DASK_AVAILABLE = False
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +51,7 @@ class Task:
         self.last_run = None
         self.is_running = False
         self.error_count = 0
+        self.future = None  # For tracking Dask futures
 
     def __lt__(self, other):
         """Compare tasks based on next execution time."""
@@ -49,13 +59,17 @@ class Task:
 
 
 class Scheduler:
-    """Handles scheduling and execution of periodic tasks with different intervals."""
+    """Handles scheduling and execution of periodic tasks with different intervals.
+    Supports both thread-based and Dask-based scheduling approaches.
+    """
 
-    def __init__(self, max_workers: int = 10):
+    def __init__(self, max_workers: int = 10, use_dask: bool = False, dask_client=None):
         """Initialize the scheduler.
 
         Args:
             max_workers: Maximum number of concurrent worker threads
+            use_dask: Whether to use Dask for task execution
+            dask_client: An existing Dask Client to use, or None to create a new one
         """
         self.tasks = []  # Priority queue of tasks
         self.tasks_lock = threading.Lock()
@@ -65,6 +79,30 @@ class Scheduler:
         self.workers_semaphore = threading.Semaphore(max_workers)
         self.task_map = {}  # Maps task_id to task for quick lookup
         self.stop_event = threading.Event()
+        
+        # Dask configuration
+        self.use_dask = use_dask and DASK_AVAILABLE
+        self.dask_client = None
+        self.dashboard_link = None
+        self.dashboard_logger_thread = None
+        self.last_dashboard_log = 0
+        
+        if self.use_dask:
+            try:
+                if dask_client:
+                    self.dask_client = dask_client
+                else:
+                    # Create a local dask client with desired number of workers
+                    self.dask_client = Client(n_workers=max_workers, threads_per_worker=1)
+                    
+                    # Log dashboard information for accessing the Dask console
+                    self.dashboard_link = self.dask_client.dashboard_link
+                    logger.info(f"Dask scheduler initialized with {max_workers} workers")
+                    logger.info(f"Access Dask dashboard at: {self.dashboard_link}")
+                    print(f"\033[97;45m DASK DASHBOARD \033[0m \033[1;95m{self.dashboard_link}\033[0m")
+            except Exception as e:
+                logger.error(f"Failed to initialize Dask: {e}")
+                self.use_dask = False
 
     def add_task(self, interval: float, callback: Callable, *args) -> int:
         """Add a new task to the scheduler.
@@ -112,7 +150,36 @@ class Scheduler:
         try:
             task.is_running = True
             task.last_run = time.time()
-            task.callback(*task.args)
+            
+            if self.use_dask and self.dask_client:
+                # Submit the task to the Dask distributed scheduler
+                try:
+                    # Clear any previous future
+                    task.future = None
+                    
+                    # Submit to Dask
+                    task.future = self.dask_client.submit(task.callback, *task.args)
+                    
+                    # Get result (this will block until the task completes)
+                    result = task.future.result()
+                    
+                    # Clear the future to free memory
+                    task.future = None
+                    
+                except Exception as dask_e:
+                    logger.error(f"Dask error executing task {task.task_id}: {dask_e}")
+                    task.error_count += 1
+                    
+                    # Fall back to non-Dask execution if Dask fails
+                    try:
+                        task.callback(*task.args)
+                    except Exception as e:
+                        logger.error(f"Fallback execution failed for task {task.task_id}: {e}")
+                        task.error_count += 1
+            else:
+                # Regular thread-based execution
+                task.callback(*task.args)
+                
         except Exception as e:
             logger.error(f"Error executing task {task.task_id}: {e}")
             task.error_count += 1
@@ -126,6 +193,13 @@ class Scheduler:
             now = time.time()
             next_task = None
             next_task_time = now + 60  # Default sleep time if no tasks
+
+            # Periodically log the Dask dashboard URL (every 10 seconds)
+            if self.use_dask and self.dask_client and self.dashboard_link:
+                if now - self.last_dashboard_log >= 10:
+                    logger.info(f"Access Dask dashboard at: {self.dashboard_link}")
+                    print(f"\033[97;45m DASK DASHBOARD \033[0m \033[1;95m{self.dashboard_link}\033[0m")
+                    self.last_dashboard_log = now
 
             with self.tasks_lock:
                 if self.tasks and self.tasks[0].next_run <= now:
@@ -187,6 +261,27 @@ class Scheduler:
             self.stop_event.set()
             if self.scheduler_thread:
                 self.scheduler_thread.join(timeout=5.0)
+            
+            # Clean up Dask resources
+            if self.use_dask and self.dask_client:
+                try:
+                    # Cancel any pending futures
+                    with self.tasks_lock:
+                        for task_id, task in self.task_map.items():
+                            if task.future and not task.future.done():
+                                task.future.cancel()
+                    
+                    # Log the final dashboard message with shutdown notice
+                    if self.dashboard_link:
+                        logger.info(f"Shutting down Dask dashboard at: {self.dashboard_link}")
+                    
+                    # Close the Dask client
+                    self.dask_client.close()
+                    logger.info("Dask client closed")
+                    self.dashboard_link = None
+                except Exception as e:
+                    logger.error(f"Error shutting down Dask client: {e}")
+                
             logger.info("Scheduler stopped")
 
     def is_running(self) -> bool:
@@ -260,11 +355,30 @@ class Scheduler:
         """Get status information about the scheduler.
 
         Returns:
-            Dictionary with status information
+            Dictionary with status information including Dask details if enabled
         """
-        return {
+        status = {
             "status": "running" if self.running else "stopped",
             "workers": self.workers_semaphore._value,
             "tasks_pending": len([t for t in self.task_map.values() if t.is_running]),
             "tasks_total": len(self.task_map),
+            "using_dask": self.use_dask
         }
+        
+        # Add detailed Dask information if available
+        if self.use_dask and self.dask_client:
+            try:
+                dask_info = self.dask_client.scheduler_info()
+                status.update({
+                    "dask_workers": len(dask_info.get("workers", {})),
+                    "dask_tasks_processing": dask_info.get("processing", 0),
+                    "dask_tasks_total": dask_info.get("total", 0),
+                    "dask_dashboard": self.dashboard_link,
+                    "dask_dashboard_refresh_interval": "10 seconds",
+                    "dask_client_active": self.dask_client.status == "running"
+                })
+            except Exception as e:
+                logger.warning(f"Could not get Dask info: {e}")
+                status["dask_error"] = str(e)
+                
+        return status
