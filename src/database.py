@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2
 from psycopg2 import pool
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -39,15 +40,34 @@ class DatabaseManager:
                 f"\033[94mInitializing database connection pool with config: {json.dumps(safe_config)}\033[0m"
             )
 
+            # Set defaults for connection parameters
+            host = db_config.get("host", "localhost")
+            port = db_config.get("port", 5432)
+            dbname = db_config.get("dbname", "website_monitor")
+            user = db_config.get("user", "postgres")
+            password = db_config.get("password", "")
+            sslmode = db_config.get("sslmode", "prefer")
+
+            # Check if database exists, create if it doesn't
+            self._ensure_database_exists(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                dbname=dbname,
+                sslmode=sslmode,
+            )
+
+            # Create the connection pool
             self.connection_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=20,
-                host=db_config.get("host", "localhost"),
-                port=db_config.get("port", 5432),
-                dbname=db_config.get("dbname", "website_monitor"),
-                user=db_config.get("user", "postgres"),
-                password=db_config.get("password", ""),
-                sslmode=db_config.get("sslmode", "prefer"),
+                host=host,
+                port=port,
+                dbname=dbname,
+                user=user,
+                password=password,
+                sslmode=sslmode,
             )
 
             # Check and update schema if needed
@@ -60,7 +80,88 @@ class DatabaseManager:
             logger.error(
                 f"\033[91mFailed to initialize database connection pool: {e}\033[0m"
             )
+            logger.error(
+                f"\033[91mMake sure PostgreSQL is running and the credentials in config.json are correct.\033[0m"
+            )
+            logger.error(
+                f"\033[91mYou can also run setup_db.py to initialize the database.\033[0m"
+            )
             raise
+
+    def _ensure_database_exists(
+        self, host: str, port: int, user: str, password: str, dbname: str, sslmode: str
+    ):
+        """Check if the database exists and create it if it doesn't.
+        
+        Args:
+            host: Database host
+            port: Database port
+            user: Database user
+            password: Database password
+            dbname: Database name
+            sslmode: SSL mode for connection
+        """
+        try:
+            # Connect to the default postgres database
+            conn = psycopg2.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                dbname="postgres",  # Connect to the default postgres database
+                sslmode=sslmode,
+            )
+            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            
+            with conn.cursor() as cursor:
+                # Check if the database exists
+                cursor.execute(
+                    "SELECT 1 FROM pg_database WHERE datname = %s",
+                    (dbname,)
+                )
+                database_exists = cursor.fetchone()
+                
+                if not database_exists:
+                    logger.info(f"\033[94mCreating database '{dbname}'...\033[0m")
+                    cursor.execute(f"CREATE DATABASE {dbname}")
+                    logger.info(f"\033[92mDatabase '{dbname}' created successfully\033[0m")
+                else:
+                    logger.info(f"\033[94mDatabase '{dbname}' already exists\033[0m")
+            
+            conn.close()
+            
+            # Connect to the created database and initialize schema
+            conn = psycopg2.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                dbname=dbname,
+                sslmode=sslmode,
+            )
+            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            
+            with conn.cursor() as cursor:
+                # Read the schema.sql file
+                schema_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "schema.sql"
+                )
+                
+                if os.path.exists(schema_path):
+                    with open(schema_path, "r") as f:
+                        schema_sql = f.read()
+                        
+                    logger.info(f"\033[94mInitializing database schema...\033[0m")
+                    cursor.execute(schema_sql)
+                    logger.info(f"\033[92mDatabase schema initialized successfully\033[0m")
+                else:
+                    logger.warning(f"\033[93mSchema file not found at {schema_path}\033[0m")
+            
+            conn.close()
+        except Exception as e:
+            logger.error(f"\033[91mError ensuring database exists: {e}\033[0m")
+            # Let the application try to continue, as the tables might already exist
 
     def _ensure_schema(self):
         """Check if monitoring_results table has necessary columns and add them if missing."""

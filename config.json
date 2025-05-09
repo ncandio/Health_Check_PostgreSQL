@@ -1,11 +1,11 @@
 {
   "database": {
-    "host": "pg-d1eb94-nicoliberatoc-6e5f.c.aivencloud.com",
-    "port": 20994,
-    "dbname": "defaultdb",
-    "user": "avnadmin",
-    "password": "AVNS_ofbHnnXOF6uuQL-wlTz",
-    "sslmode": "require"
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "website_monitor",
+    "user": "postgres",
+    "password": "postgres",
+    "sslmode": "prefer"
   },
   "websites": [
     {
@@ -259,7 +259,7 @@
       "regex_pattern": "Discord"
     }
   ],
-  "max_workers": 10,
+  "max_workers": 50,
   "retry_limit": 3,
   "connection_timeout": 10
 }
