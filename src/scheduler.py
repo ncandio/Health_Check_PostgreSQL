@@ -1,14 +1,15 @@
 """
-Custom scheduler implementation for website monitoring.
+Custom scheduler implementation for website monitoring using uvloop event loop.
 Handles concurrent execution of monitoring tasks with different intervals.
 Supports both a thread-based scheduler and Dask distributed computing.
 """
 
-import heapq
+import asyncio
 import logging
-import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
+import uvloop
+from concurrent.futures import ThreadPoolExecutor
 
 # Import Dask components for distributed computing
 try:
@@ -29,7 +30,6 @@ class Task:
     def __init__(
         self,
         task_id: int,
-        next_run: float,
         interval: float,
         callback: Callable,
         args: tuple,
@@ -38,44 +38,125 @@ class Task:
 
         Args:
             task_id: Unique task identifier
-            next_run: Next execution time (timestamp)
             interval: Execution interval in seconds
             callback: Function to call
             args: Arguments for the callback function
         """
+        if asyncio.iscoroutinefunction(callback):
+            raise ValueError("Async functions are not supported. Please provide a synchronous function.")
+            
         self.task_id = task_id
-        self.next_run = next_run
         self.interval = interval
         self.callback = callback
         self.args = args
         self.last_run = None
         self.is_running = False
         self.error_count = 0
+        self.task = None
+        self._stop = False
+        self._timeout = 300  # 5 minutes timeout for task execution
+
+    async def run(self, scheduler):
+        """Run the task periodically."""
+        while not self._stop:
+            try:
+                await scheduler._execute_task(self)
+                # Use wait_for to ensure sleep doesn't block indefinitely
+                await asyncio.wait_for(asyncio.sleep(self.interval), timeout=self.interval + 1)
+            except asyncio.TimeoutError:
+                logger.warning(f"Task {self.task_id} sleep timeout, continuing...")
+                continue
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in task {self.task_id} loop: {e}")
+                # Use wait_for to ensure sleep doesn't block indefinitely
+                try:
+                    await asyncio.wait_for(asyncio.sleep(self.interval), timeout=self.interval + 1)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Task {self.task_id} error recovery sleep timeout, continuing...")
+                    continue
+
         self.future = None  # For tracking Dask futures
 
-    def __lt__(self, other):
-        """Compare tasks based on next execution time."""
-        return self.next_run < other.next_run
+
+    def stop(self):
+        """Stop the task."""
+        self._stop = True
+        if self.task and not self.task.done():
+            self.task.cancel()
 
 
 class Scheduler:
+
+    """Handles scheduling and execution of periodic tasks with different intervals using uvloop."""
+
     """Handles scheduling and execution of periodic tasks with different intervals.
     Supports both thread-based and Dask-based scheduling approaches.
     """
+
 
     def __init__(self, max_workers: int = 10, use_dask: bool = False, dask_client=None):
         """Initialize the scheduler.
 
         Args:
+            max_workers: Maximum number of concurrent workers
             max_workers: Maximum number of concurrent worker threads
             use_dask: Whether to use Dask for task execution
             dask_client: An existing Dask Client to use, or None to create a new one
         """
-        self.tasks = []  # Priority queue of tasks
-        self.tasks_lock = threading.Lock()
-        self.running = False
-        self.scheduler_thread = None
+        self.loop = uvloop.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.tasks: Dict[int, Task] = {}
         self.task_counter = 0
+
+        self.running = False
+        self.max_workers = max_workers
+        self.active_workers = 0
+        self.worker_semaphore = asyncio.Semaphore(max_workers)
+        self._stop_event = asyncio.Event()
+        self._thread_pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._timeout = 300  # 5 minutes timeout for task execution
+
+    async def _execute_task(self, task: Task):
+        """Execute a task asynchronously."""
+        try:
+            task.is_running = True
+            task.last_run = time.time()
+            
+            # Use wait_for to ensure semaphore doesn't block indefinitely
+            await asyncio.wait_for(
+                self.worker_semaphore.acquire(),
+                timeout=task._timeout
+            )
+            
+            self.active_workers += 1
+            
+            # Run task with timeout
+            await asyncio.wait_for(
+                self.loop.run_in_executor(
+                    self._thread_pool,
+                    task.callback,
+                    *task.args
+                ),
+                timeout=task._timeout
+            )
+                
+        except asyncio.TimeoutError:
+            logger.error(f"Task {task.task_id} execution timed out after {task._timeout} seconds")
+            task.error_count += 1
+        except Exception as e:
+            logger.error(f"Error executing task {task.task_id}: {e}")
+            task.error_count += 1
+        finally:
+            task.is_running = False
+            self.active_workers -= 1
+            try:
+                self.worker_semaphore.release()
+            except ValueError:
+                # Ignore if semaphore was already released
+                pass
+
         self.workers_semaphore = threading.Semaphore(max_workers)
         self.task_map = {}  # Maps task_id to task for quick lookup
         self.stop_event = threading.Event()
@@ -109,22 +190,28 @@ class Scheduler:
 
         Args:
             interval: Execution interval in seconds
-            callback: Function to call
+            callback: Function to call (must be synchronous)
             args: Arguments for the callback function
 
         Returns:
             Task ID
+
+        Raises:
+            ValueError: If callback is an async function
         """
-        with self.tasks_lock:
-            self.task_counter += 1
-            task_id = self.task_counter
-            next_run = time.time()
+        if asyncio.iscoroutinefunction(callback):
+            raise ValueError("Async functions are not supported. Please provide a synchronous function.")
 
-            task = Task(task_id, next_run, interval, callback, args)
-            self.task_map[task_id] = task
-            heapq.heappush(self.tasks, task)
-            logger.info(f"Added task {task_id} with interval {interval}s")
+        self.task_counter += 1
+        task_id = self.task_counter
 
+        task = Task(task_id, interval, callback, args)
+        self.tasks[task_id] = task
+        
+        if self.running:
+            task.task = self.loop.create_task(task.run(self))
+        
+        logger.info(f"Added task {task_id} with interval {interval}s")
         return task_id
 
     def remove_task(self, task_id: int) -> bool:
@@ -136,18 +223,45 @@ class Scheduler:
         Returns:
             Whether the task was removed
         """
-        with self.tasks_lock:
-            if task_id in self.task_map:
-                # Mark the task for removal by setting interval to -1
-                # Actual removal will happen during next task processing
-                self.task_map[task_id].interval = -1
-                logger.info(f"Marked task {task_id} for removal")
-                return True
-            return False
+        if task_id in self.tasks:
+            task = self.tasks[task_id]
+            task.stop()
+            del self.tasks[task_id]
+            logger.info(f"Removed task {task_id}")
+            return True
+        return False
 
-    def _worker(self, task):
-        """Worker thread that executes a task."""
+    async def _run(self):
+        """Run the scheduler."""
+        self.running = True
+        self._stop_event.clear()
+        
+        # Start all existing tasks
+        for task in self.tasks.values():
+            task.task = self.loop.create_task(task.run(self))
+        
         try:
+
+            # Wait for stop signal with timeout
+            while not self._stop_event.is_set():
+                try:
+                    await asyncio.wait_for(
+                        self._stop_event.wait(),
+                        timeout=1.0  # Check every second
+                    )
+                except asyncio.TimeoutError:
+                    # Check if any tasks are stuck
+                    for task_id, task in list(self.tasks.items()):
+                        if task.is_running and time.time() - task.last_run > task._timeout:
+                            logger.warning(f"Task {task_id} appears stuck, removing...")
+                            self.remove_task(task_id)
+                    continue
+        finally:
+            # Stop all tasks
+            for task in self.tasks.values():
+                task.stop()
+            
+            self.running = False
             task.is_running = True
             task.last_run = time.time()
             
@@ -240,23 +354,26 @@ class Scheduler:
                 if sleep_time > 0:
                     self.stop_event.wait(sleep_time)
 
+
     def start(self):
         """Start the scheduler."""
         if not self.running:
-            self.running = True
-            self.stop_event.clear()
-            self.scheduler_thread = threading.Thread(
-                target=self._scheduler_loop, daemon=True
-            )
-            self.scheduler_thread.start()
+            try:
+                self.loop.run_until_complete(self._run())
+            except KeyboardInterrupt:
+                self.stop()
+            except Exception as e:
+                logger.error(f"Unexpected error in scheduler: {e}")
+                self.stop()
+            finally:
+                self._thread_pool.shutdown(wait=True)
             logger.info("Scheduler started")
-
-            # Give the scheduler a moment to fully initialize
-            time.sleep(0.5)
 
     def stop(self):
         """Stop the scheduler."""
         if self.running:
+            self._stop_event.set()
+            self.loop.stop()
             self.running = False
             self.stop_event.set()
             if self.scheduler_thread:
@@ -282,6 +399,7 @@ class Scheduler:
                 except Exception as e:
                     logger.error(f"Error shutting down Dask client: {e}")
                 
+
             logger.info("Scheduler stopped")
 
     def is_running(self) -> bool:
@@ -297,28 +415,21 @@ class Scheduler:
         Returns:
             Dictionary with task information or None if task doesn't exist
         """
-        with self.tasks_lock:
-            if task_id in self.task_map:
-                task = self.task_map[task_id]
-                return {
-                    "task_id": task.task_id,
-                    "interval": task.interval,
-                    "next_run": task.next_run,
-                    "next_run_time": time.strftime(
-                        "%Y-%m-%d %H:%M:%S", time.localtime(task.next_run)
-                    ),
-                    "last_run": task.last_run,
-                    "last_run_time": (
-                        time.strftime(
-                            "%Y-%m-%d %H:%M:%S", time.localtime(task.last_run)
-                        )
-                        if task.last_run
-                        else None
-                    ),
-                    "is_running": task.is_running,
-                    "error_count": task.error_count,
-                }
-            return None
+        if task_id in self.tasks:
+            task = self.tasks[task_id]
+            return {
+                "task_id": task.task_id,
+                "interval": task.interval,
+                "last_run": task.last_run,
+                "last_run_time": (
+                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(task.last_run))
+                    if task.last_run
+                    else None
+                ),
+                "is_running": task.is_running,
+                "error_count": task.error_count,
+            }
+        return None
 
     def list_tasks(self) -> List[Dict]:
         """List all tasks and their status.
@@ -326,30 +437,21 @@ class Scheduler:
         Returns:
             List of dictionaries with task information
         """
-        result = []
-        with self.tasks_lock:
-            for task_id, task in self.task_map.items():
-                result.append(
-                    {
-                        "task_id": task.task_id,
-                        "interval": task.interval,
-                        "next_run": task.next_run,
-                        "next_run_time": time.strftime(
-                            "%Y-%m-%d %H:%M:%S", time.localtime(task.next_run)
-                        ),
-                        "last_run": task.last_run,
-                        "last_run_time": (
-                            time.strftime(
-                                "%Y-%m-%d %H:%M:%S", time.localtime(task.last_run)
-                            )
-                            if task.last_run
-                            else None
-                        ),
-                        "is_running": task.is_running,
-                        "error_count": task.error_count,
-                    }
-                )
-        return result
+        return [
+            {
+                "task_id": task.task_id,
+                "interval": task.interval,
+                "last_run": task.last_run,
+                "last_run_time": (
+                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(task.last_run))
+                    if task.last_run
+                    else None
+                ),
+                "is_running": task.is_running,
+                "error_count": task.error_count,
+            }
+            for task in self.tasks.values()
+        ]
 
     def get_dask_status(self) -> Dict:
         """Get status information about the scheduler.
@@ -359,6 +461,10 @@ class Scheduler:
         """
         status = {
             "status": "running" if self.running else "stopped",
+
+            "workers": self.max_workers - self.active_workers,
+            "tasks_pending": len([t for t in self.tasks.values() if t.is_running]),
+            "tasks_total": len(self.tasks),
             "workers": self.workers_semaphore._value,
             "tasks_pending": len([t for t in self.task_map.values() if t.is_running]),
             "tasks_total": len(self.task_map),
