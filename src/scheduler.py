@@ -1,6 +1,7 @@
 """
 Custom scheduler implementation for website monitoring using uvloop event loop.
 Handles concurrent execution of monitoring tasks with different intervals.
+Supports both a thread-based scheduler and Dask distributed computing.
 """
 
 import asyncio
@@ -9,6 +10,14 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 import uvloop
 from concurrent.futures import ThreadPoolExecutor
+
+# Import Dask components for distributed computing
+try:
+    import dask
+    from distributed import Client, Future
+    DASK_AVAILABLE = True
+except ImportError:
+    DASK_AVAILABLE = False
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +77,9 @@ class Task:
                     logger.warning(f"Task {self.task_id} error recovery sleep timeout, continuing...")
                     continue
 
+        self.future = None  # For tracking Dask futures
+
+
     def stop(self):
         """Stop the task."""
         self._stop = True
@@ -76,18 +88,28 @@ class Task:
 
 
 class Scheduler:
+
     """Handles scheduling and execution of periodic tasks with different intervals using uvloop."""
 
-    def __init__(self, max_workers: int = 10):
+    """Handles scheduling and execution of periodic tasks with different intervals.
+    Supports both thread-based and Dask-based scheduling approaches.
+    """
+
+
+    def __init__(self, max_workers: int = 10, use_dask: bool = False, dask_client=None):
         """Initialize the scheduler.
 
         Args:
             max_workers: Maximum number of concurrent workers
+            max_workers: Maximum number of concurrent worker threads
+            use_dask: Whether to use Dask for task execution
+            dask_client: An existing Dask Client to use, or None to create a new one
         """
         self.loop = uvloop.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.tasks: Dict[int, Task] = {}
         self.task_counter = 0
+
         self.running = False
         self.max_workers = max_workers
         self.active_workers = 0
@@ -134,6 +156,34 @@ class Scheduler:
             except ValueError:
                 # Ignore if semaphore was already released
                 pass
+
+        self.workers_semaphore = threading.Semaphore(max_workers)
+        self.task_map = {}  # Maps task_id to task for quick lookup
+        self.stop_event = threading.Event()
+        
+        # Dask configuration
+        self.use_dask = use_dask and DASK_AVAILABLE
+        self.dask_client = None
+        self.dashboard_link = None
+        self.dashboard_logger_thread = None
+        self.last_dashboard_log = 0
+        
+        if self.use_dask:
+            try:
+                if dask_client:
+                    self.dask_client = dask_client
+                else:
+                    # Create a local dask client with desired number of workers
+                    self.dask_client = Client(n_workers=max_workers, threads_per_worker=1)
+                    
+                    # Log dashboard information for accessing the Dask console
+                    self.dashboard_link = self.dask_client.dashboard_link
+                    logger.info(f"Dask scheduler initialized with {max_workers} workers")
+                    logger.info(f"Access Dask dashboard at: {self.dashboard_link}")
+                    print(f"\033[97;45m DASK DASHBOARD \033[0m \033[1;95m{self.dashboard_link}\033[0m")
+            except Exception as e:
+                logger.error(f"Failed to initialize Dask: {e}")
+                self.use_dask = False
 
     def add_task(self, interval: float, callback: Callable, *args) -> int:
         """Add a new task to the scheduler.
@@ -191,6 +241,7 @@ class Scheduler:
             task.task = self.loop.create_task(task.run(self))
         
         try:
+
             # Wait for stop signal with timeout
             while not self._stop_event.is_set():
                 try:
@@ -211,6 +262,98 @@ class Scheduler:
                 task.stop()
             
             self.running = False
+            task.is_running = True
+            task.last_run = time.time()
+            
+            if self.use_dask and self.dask_client:
+                # Submit the task to the Dask distributed scheduler
+                try:
+                    # Clear any previous future
+                    task.future = None
+                    
+                    # Submit to Dask
+                    task.future = self.dask_client.submit(task.callback, *task.args)
+                    
+                    # Get result (this will block until the task completes)
+                    result = task.future.result()
+                    
+                    # Clear the future to free memory
+                    task.future = None
+                    
+                except Exception as dask_e:
+                    logger.error(f"Dask error executing task {task.task_id}: {dask_e}")
+                    task.error_count += 1
+                    
+                    # Fall back to non-Dask execution if Dask fails
+                    try:
+                        task.callback(*task.args)
+                    except Exception as e:
+                        logger.error(f"Fallback execution failed for task {task.task_id}: {e}")
+                        task.error_count += 1
+            else:
+                # Regular thread-based execution
+                task.callback(*task.args)
+                
+        except Exception as e:
+            logger.error(f"Error executing task {task.task_id}: {e}")
+            task.error_count += 1
+        finally:
+            task.is_running = False
+            self.workers_semaphore.release()
+
+    def _scheduler_loop(self):
+        """Main scheduler loop that dispatches tasks at their scheduled times."""
+        while not self.stop_event.is_set() and self.running:
+            now = time.time()
+            next_task = None
+            next_task_time = now + 60  # Default sleep time if no tasks
+
+            # Periodically log the Dask dashboard URL (every 10 seconds)
+            if self.use_dask and self.dask_client and self.dashboard_link:
+                if now - self.last_dashboard_log >= 10:
+                    logger.info(f"Access Dask dashboard at: {self.dashboard_link}")
+                    print(f"\033[97;45m DASK DASHBOARD \033[0m \033[1;95m{self.dashboard_link}\033[0m")
+                    self.last_dashboard_log = now
+
+            with self.tasks_lock:
+                if self.tasks and self.tasks[0].next_run <= now:
+                    task = heapq.heappop(self.tasks)
+
+                    # Check if task was marked for removal
+                    if task.interval < 0:
+                        if task.task_id in self.task_map:
+                            del self.task_map[task.task_id]
+                            logger.info(f"Removed task {task.task_id}")
+                    else:
+                        # Skip if the task is already running
+                        if task.is_running:
+                            # Re-schedule with a small delay to check again
+                            task.next_run = now + 1
+                            heapq.heappush(self.tasks, task)
+                            continue
+
+                        # Schedule next execution
+                        task.next_run = now + task.interval
+                        heapq.heappush(self.tasks, task)
+                        next_task = task
+
+                # Calculate time until next task
+                if self.tasks:
+                    next_task_time = self.tasks[0].next_run
+
+            if next_task:
+                # Acquire worker semaphore
+                self.workers_semaphore.acquire()
+                # Start worker thread
+                threading.Thread(
+                    target=self._worker, args=(next_task,), daemon=True
+                ).start()
+            else:
+                # Sleep until next task or max 5 seconds
+                sleep_time = min(max(0.1, next_task_time - time.time()), 5)
+                if sleep_time > 0:
+                    self.stop_event.wait(sleep_time)
+
 
     def start(self):
         """Start the scheduler."""
@@ -231,6 +374,32 @@ class Scheduler:
         if self.running:
             self._stop_event.set()
             self.loop.stop()
+            self.running = False
+            self.stop_event.set()
+            if self.scheduler_thread:
+                self.scheduler_thread.join(timeout=5.0)
+            
+            # Clean up Dask resources
+            if self.use_dask and self.dask_client:
+                try:
+                    # Cancel any pending futures
+                    with self.tasks_lock:
+                        for task_id, task in self.task_map.items():
+                            if task.future and not task.future.done():
+                                task.future.cancel()
+                    
+                    # Log the final dashboard message with shutdown notice
+                    if self.dashboard_link:
+                        logger.info(f"Shutting down Dask dashboard at: {self.dashboard_link}")
+                    
+                    # Close the Dask client
+                    self.dask_client.close()
+                    logger.info("Dask client closed")
+                    self.dashboard_link = None
+                except Exception as e:
+                    logger.error(f"Error shutting down Dask client: {e}")
+                
+
             logger.info("Scheduler stopped")
 
     def is_running(self) -> bool:
@@ -288,11 +457,34 @@ class Scheduler:
         """Get status information about the scheduler.
 
         Returns:
-            Dictionary with status information
+            Dictionary with status information including Dask details if enabled
         """
-        return {
+        status = {
             "status": "running" if self.running else "stopped",
+
             "workers": self.max_workers - self.active_workers,
             "tasks_pending": len([t for t in self.tasks.values() if t.is_running]),
             "tasks_total": len(self.tasks),
+            "workers": self.workers_semaphore._value,
+            "tasks_pending": len([t for t in self.task_map.values() if t.is_running]),
+            "tasks_total": len(self.task_map),
+            "using_dask": self.use_dask
         }
+        
+        # Add detailed Dask information if available
+        if self.use_dask and self.dask_client:
+            try:
+                dask_info = self.dask_client.scheduler_info()
+                status.update({
+                    "dask_workers": len(dask_info.get("workers", {})),
+                    "dask_tasks_processing": dask_info.get("processing", 0),
+                    "dask_tasks_total": dask_info.get("total", 0),
+                    "dask_dashboard": self.dashboard_link,
+                    "dask_dashboard_refresh_interval": "10 seconds",
+                    "dask_client_active": self.dask_client.status == "running"
+                })
+            except Exception as e:
+                logger.warning(f"Could not get Dask info: {e}")
+                status["dask_error"] = str(e)
+                
+        return status
