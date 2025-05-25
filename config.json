@@ -259,9 +259,9 @@
       "regex_pattern": "Discord"
     }
   ],
-  "max_workers": 50,
+  "max_workers": 10,
   "retry_limit": 3,
   "connection_timeout": 10,
-  "use_dask": true
+  "use_dask": false
 }
 
