@@ -1,196 +1,179 @@
-# Website Monitoring System
+# PostgreSQL Health Check
 
-A robust Python application for monitoring website availability and content verification with PostgreSQL database integration.
+A robust Python application for monitoring website availability and performing content verification with PostgreSQL database integration.
 
 ## Overview
 
-This system periodically checks configured websites, verifies their availability, and optionally validates content using regex patterns. It stores all monitoring results in a PostgreSQL database for historical tracking and analysis.
+This application allows you to monitor multiple websites simultaneously, checking for:
+- Website availability (HTTP status codes)
+- Response time
+- Content validation via regex patterns
+- Detailed performance metrics (DNS lookup time, content size, etc.)
 
-> **IMPORTANT**: This branch with Dask integration is EXPERIMENTAL and for RESEARCH purposes only. The Dask implementation ([https://docs.dask.org/en/stable/index.html](https://docs.dask.org/en/stable/index.html)) provides distributed computing capabilities, but is not recommended for production use in this version.
+All monitoring data is stored in a PostgreSQL database for historical analysis and reporting.
 
 ## Features
 
-- **Configurable website monitoring** with customizable check intervals
-- **Content verification** using regex patterns
-- **Response time tracking** and HTTP status code validation
-- **Dual-mode scheduling** with thread-based and Dask distributed computing
-- **Simple thread-based scheduler** implementation for reliability
-- **PostgreSQL database integration** with local or remote PostgreSQL
-- **Comprehensive logging** system with rotation
-- **Graceful shutdown** handling
-- **Dask dashboard** for real-time monitoring of distributed tasks
-
-## Architecture
-
-The application consists of several modular components:
-
-- `main.py`: Entry point and orchestration
-- `database.py`: PostgreSQL database integration using connection pooling
-- `monitor.py`: Website availability and content checking
-- `scheduler.py`: Dual-mode scheduler supporting threads and Dask distributed computing
-- `validators.py`: Configuration validation
-
-## Implementation Notes
-
-- Multiple processing and threading approaches are provided:
-  - The scheduler supports both a simple thread-based implementation for maximum reliability and a Dask-based distributed computing approach
-  - Enable Dask by setting `"use_dask": true` in config.json
-  - Configure number of Dask workers with the `max_workers` setting in config.json
-  - When Dask is enabled, a dashboard URL will be displayed at startup for monitoring tasks (typically at http://localhost:8787)
-  - The Dask console is available at http://localhost:8787 and the URL is logged at 10-second intervals for easy access
-  - A third approach using pyuv for event-based processing is also available
-- Configuration supports 1000 websites with regex pattern matching
-- Comprehensive test suite for scheduler, database, and website monitoring
-- Connects to a PostgreSQL database (configured in config.json)
-
-## Running the Application
-
-### Setting up a Virtual Environment
-
-It's recommended to use a virtual environment to isolate the project dependencies:
-
-```bash
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment (Linux/Mac)
-source venv/bin/activate
-
-# Activate the virtual environment (Windows)
-venv\Scripts\activate
-```
-
-### Installing Dependencies and Running
-
-Once the virtual environment is activated:
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up the PostgreSQL database
-python setup_db.py
-
-# Run the application
-python src/main.py
-```
-
-To deactivate the virtual environment when finished:
-
-```bash
-deactivate
-```
-
-### Database Setup
-
-#### Prerequisites
-
-Before setting up the database, make sure PostgreSQL is installed on your system. You can check this by running:
-
-```bash
-python check_postgres.py
-```
-
-This script will verify if PostgreSQL is installed and provide installation instructions if needed.
-
-#### Setup Scripts
-
-The project includes several setup scripts to help you get started with PostgreSQL:
-
-#### Automatic PostgreSQL Setup
-
-For a guided setup experience, run one of the following scripts based on your operating system:
-
-**Linux/macOS:**
-```bash
-./setup_postgres.sh
-```
-
-**Windows:**
-```bash
-setup_postgres.bat
-```
-
-These scripts will:
-1. Check if PostgreSQL is installed
-2. Start the PostgreSQL service if needed (Linux/macOS)
-3. Create the required user and database
-4. Set appropriate permissions
-
-#### Manual Database Setup
-
-If you prefer to set up the database manually or if you're on Windows, use:
-
-```bash
-python setup_db.py
-```
-
-This Python script will:
-1. Connect to PostgreSQL using the credentials in config.json
-2. Create the database if it doesn't exist
-3. Set up all necessary tables, indexes, and views
-
-Make sure PostgreSQL is running and the credentials in `config.json` are correct.
-
-
-## Configuration
-
-The `config.json` file includes:
-- Database connection parameters
-- Website monitoring configurations (URLs, intervals, regex patterns)
-- Application settings (worker count, timeouts, etc.)
-- Scheduler options (`use_dask: true/false` for enabling distributed execution)
-
-## Database Management
-
-A utility script is provided to query and analyze the PostgreSQL database:
-
-```bash
-# List all database tables
-./query_db.py --list-tables
-
-# Describe a table's structure
-./query_db.py --describe TABLE_NAME
-
-# Query table data with optional filters
-./query_db.py --query TABLE_NAME [--limit N] [--where "condition"] [--order-by "column"]
-
-# Run custom SQL queries
-./query_db.py --sql "SELECT * FROM table WHERE condition"
-
-# View monitoring summary for the last 24 hours
-./query_db.py --summary
-
-# Analyze website performance
-./query_db.py --analyze [--website-id ID] [--days N]
-```
-
-For more information on available options:
-```bash
-./query_db.py --help
-```
-
-## Testing
-
-The testing suite includes:
-
-1. **Scheduler Tests**: Validates the custom thread-based scheduling system
-   ```
-   python -m pytest test/test_scheduler.py
-   ```
-
-2. **Database Tests**: Verifies database connection and table creation functionality
-   ```
-   python -m pytest test/test_database.py
-   ```
-
-3. **Website Monitoring Tests**: Tests the system with 500 different websites
-   ```
-   python -m pytest test/test_500_websites.py
-   ```
-
-The system has been configured to handle up to 1000 websites in the original configuration file.
+- **Real-time monitoring** of website availability and performance
+- **Content validation** with customizable regex patterns
+- **PostgreSQL integration** for persistent storage of monitoring results
+- **Distributed computing** support with Dask for high-performance monitoring
+- **Comprehensive reporting** with availability statistics
+- **High configurability** through JSON config files
+- **Detailed logging** of all monitoring activities
 
 ## Requirements
 
-See `requirements.txt` for dependencies.
+- Python 3.8+
+- PostgreSQL 12+
+- Required Python packages (see `requirements.txt`)
+
+## Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/Health_Check_PostgreSQL.git
+   cd Health_Check_PostgreSQL
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Verify PostgreSQL installation**:
+   ```bash
+   # Check if PostgreSQL is installed
+   python check_postgres.py
+   ```
+
+## Database Setup
+
+1. **Set up PostgreSQL**:
+
+   For Linux/macOS:
+   ```bash
+   chmod +x setup_postgres.sh
+   ./setup_postgres.sh
+   ```
+
+   For Windows:
+   ```
+   setup_postgres.bat
+   ```
+
+2. **Initialize the database schema**:
+   ```bash
+   python setup_db.py
+   ```
+
+## Configuration
+
+The application uses a JSON configuration file (`config.json`) with the following structure:
+
+```json
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "website_monitor",
+    "user": "postgres",
+    "password": "postgres",
+    "sslmode": "prefer"
+  },
+  "websites": [
+    {
+      "url": "https://www.example.com",
+      "check_interval_seconds": 60,
+      "regex_pattern": "Example Pattern"
+    }
+  ],
+  "max_workers": 50,
+  "retry_limit": 3,
+  "connection_timeout": 10,
+  "use_dask": true
+}
+```
+
+You can modify this file to:
+- Configure database connection parameters
+- Add/remove websites to monitor
+- Set check intervals for each website
+- Define regex patterns for content validation
+- Adjust performance settings (workers, timeouts, etc.)
+- Enable/disable Dask distributed computing
+
+## Running the Application
+
+Start the monitoring service:
+
+```bash
+python src/main.py
+```
+
+The application will:
+1. Connect to the PostgreSQL database
+2. Load the website configurations
+3. Start monitoring each website at the specified intervals
+4. Store results in the database
+
+## Querying Monitoring Data
+
+The application includes a utility for querying the database:
+
+```bash
+# Show monitoring summary for the last 24 hours
+python query_db.py --summary
+
+# Analyze website performance
+python query_db.py --analyze --days 7
+
+# Query specific tables
+python query_db.py --query monitoring_results --limit 20
+
+# Run custom SQL queries
+python query_db.py --sql "SELECT * FROM monitoring_results WHERE success = false"
+
+# List all database tables
+python query_db.py --list-tables
+
+# Describe table structure
+python query_db.py --describe website_configs
+```
+
+## Performance Optimization
+
+For monitoring a large number of websites, the application supports Dask distributed computing:
+
+1. Enable Dask in the config.json file: `"use_dask": true`
+2. Adjust the number of workers: `"max_workers": 50`
+
+When Dask is enabled, the application will display a link to the Dask dashboard for real-time monitoring of task execution.
+
+## Project Structure
+
+- `src/` - Core application code
+  - `main.py` - Main entry point
+  - `monitor.py` - Website monitoring logic
+  - `database.py` - Database operations
+  - `scheduler.py` - Task scheduling
+  - `validators.py` - Input validation
+- `schema.sql` - Database schema
+- `setup_db.py` - Database initialization
+- `query_db.py` - Database query utility
+- `check_postgres.py` - PostgreSQL installation checker
+- `setup_postgres.sh/bat` - PostgreSQL setup scripts
+- `config.json` - Application configuration
+- `logs/` - Application logs
+
+## Logging
+
+The application logs detailed information about monitoring activities to the `logs/` directory. The main log file is `website_monitor.log`.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
