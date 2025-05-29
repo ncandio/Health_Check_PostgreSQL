@@ -1,12 +1,12 @@
 # SiteSentinel
 
-A robust Python application for monitoring website availability and content verification with PostgreSQL database integration.
+Enterprise-grade website monitoring platform that detects downtime, validates content, and analyzes performance metrics at scale.
 
-![SiteSentinel](images/sitesentinel.png)
+<img src="images/sitesentinel.png" width="400" alt="SiteSentinel Logo">
 
 ## Overview
 
-This system periodically checks configured websites, verifies their availability, and optionally validates content using regex patterns. It stores all monitoring results in a PostgreSQL database for historical tracking and analysis.
+SiteSentinel delivers mission-critical website monitoring with powerful content validation, comprehensive metrics collection, and advanced performance analytics. Built for scale, it supports thousands of concurrent checks with flexible execution models and provides real-time insights through its PostgreSQL integration and interactive dashboards.
 
 ## Features
 
