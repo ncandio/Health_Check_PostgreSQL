@@ -1,4 +1,4 @@
-# Website Monitoring System
+# SiteSentinel
 
 A robust Python application for monitoring website availability and content verification with PostgreSQL database integration.
 
