@@ -43,7 +43,7 @@ class DatabaseManager:
             # Set defaults for connection parameters
             host = db_config.get("host", "localhost")
             port = db_config.get("port", 5432)
-            dbname = db_config.get("dbname", "website_monitor")
+            dbname = db_config.get("dbname", "sitesentinel")
             user = db_config.get("user", "postgres")
             password = db_config.get("password", "")
             sslmode = db_config.get("sslmode", "prefer")

@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}  Website Monitor PostgreSQL Setup Helper${NC}"
+echo -e "${BLUE}  SiteSentinel PostgreSQL Setup Helper${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 # Check if PostgreSQL is installed
@@ -49,7 +49,7 @@ echo -e "${BLUE}---------------------------------------------------${NC}"
 echo -e "${YELLOW}Would you like to set up the database with default credentials?${NC}"
 echo -e "This will:"
 echo -e "1. Create a PostgreSQL user 'postgres' with password 'postgres'"
-echo -e "2. Create a database 'website_monitor'"
+echo -e "2. Create a database 'sitesentinel'"
 echo -e "3. Configure the application to use these credentials"
 echo -e ""
 read -p "Proceed? (y/n): " answer
@@ -74,17 +74,17 @@ sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 echo -e "${GREEN}Password set successfully.${NC}"
 
 # Create the database
-echo -e "${YELLOW}Creating 'website_monitor' database...${NC}"
-if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw website_monitor; then
-    echo -e "${GREEN}Database 'website_monitor' already exists.${NC}"
+echo -e "${YELLOW}Creating 'sitesentinel' database...${NC}"
+if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw sitesentinel; then
+    echo -e "${GREEN}Database 'sitesentinel' already exists.${NC}"
 else
-    sudo -u postgres createdb website_monitor
+    sudo -u postgres createdb sitesentinel
     echo -e "${GREEN}Database created successfully.${NC}"
 fi
 
 # Verify the connection works
 echo -e "${YELLOW}Verifying database connection...${NC}"
-if PGPASSWORD=postgres psql -h localhost -U postgres -d website_monitor -c "SELECT 1" > /dev/null 2>&1; then
+if PGPASSWORD=postgres psql -h localhost -U postgres -d sitesentinel -c "SELECT 1" > /dev/null 2>&1; then
     echo -e "${GREEN}Database connection successful!${NC}"
 else
     echo -e "${RED}Could not connect to the database.${NC}"
