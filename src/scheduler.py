@@ -164,6 +164,10 @@ class Scheduler:
                 ),
                 timeout=task._timeout
             )
+            
+            # Force garbage collection after task execution to clean up resources
+            import gc
+            gc.collect()
                 
         except asyncio.TimeoutError:
             logger.error(f"Task {task.task_id} execution timed out after {task._timeout} seconds")
@@ -228,7 +232,6 @@ class Scheduler:
 
     async def _run(self):
         """Run the scheduler."""
-        self.running = True
         self._stop_event.clear()
         
         # Start all existing tasks
@@ -236,7 +239,9 @@ class Scheduler:
             task.task = self.loop.create_task(task.run(self))
         
         try:
-
+            # Log that the scheduler is really running
+            logger.info("Scheduler event loop is running and processing tasks")
+            
             # Wait for stop signal with timeout
             while not self._stop_event.is_set():
                 try:
@@ -247,32 +252,43 @@ class Scheduler:
                 except asyncio.TimeoutError:
                     # Check if any tasks are stuck
                     for task_id, task in list(self.tasks.items()):
-                        if task.is_running and time.time() - task.last_run > task._timeout:
+                        if task.is_running and task.last_run and time.time() - task.last_run > task._timeout:
                             logger.warning(f"Task {task_id} appears stuck, removing...")
                             self.remove_task(task_id)
                     continue
+        except Exception as e:
+            logger.error(f"Error in scheduler main loop: {e}")
         finally:
             # Stop all tasks
             for task in self.tasks.values():
                 task.stop()
             
             self.running = False
+            logger.info("Scheduler event loop has stopped")
 
 
 
     def start(self):
         """Start the scheduler."""
         if not self.running:
-            try:
-                self.loop.run_until_complete(self._run())
-            except KeyboardInterrupt:
-                self.stop()
-            except Exception as e:
-                logger.error(f"Unexpected error in scheduler: {e}")
-                self.stop()
-            finally:
-                self._thread_pool.shutdown(wait=True)
+            self.running = True
+            threading.Thread(target=self._start_loop, daemon=True).start()
             logger.info("Scheduler started")
+            
+    def _start_loop(self):
+        """Start the event loop in a separate thread."""
+        try:
+            self.loop.run_until_complete(self._run())
+        except KeyboardInterrupt:
+            self.stop()
+        except Exception as e:
+            logger.error(f"Unexpected error in scheduler: {e}")
+            self.stop()
+        finally:
+            try:
+                self._thread_pool.shutdown(wait=True)
+            except Exception as e:
+                logger.error(f"Error shutting down thread pool: {e}")
 
     def stop(self):
         """Stop the scheduler."""
@@ -280,6 +296,14 @@ class Scheduler:
             self._stop_event.set()
             self.loop.stop()
             self.running = False
+            
+            # Close thread pool executor to release resources
+            if hasattr(self, '_thread_pool') and self._thread_pool:
+                try:
+                    self._thread_pool.shutdown(wait=True)
+                    logger.info("Thread pool executor shutdown completed")
+                except Exception as e:
+                    logger.error(f"Error shutting down thread pool: {e}")
             
             # Clean up Dask resources
             if self.use_dask and self.dask_client:
@@ -299,6 +323,10 @@ class Scheduler:
                     self.dashboard_link = None
                 except Exception as e:
                     logger.error(f"Error shutting down Dask client: {e}")
+            
+            # Force garbage collection at shutdown
+            import gc
+            gc.collect()
                 
             logger.info("Scheduler stopped")
 
