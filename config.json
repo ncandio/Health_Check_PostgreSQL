@@ -262,10 +262,6 @@
   "max_workers": 10,
   "retry_limit": 3,
   "connection_timeout": 10,
-<<<<<<< HEAD
-  "use_dask": false
-=======
   "use_dask": false 
->>>>>>> rename-to-sitesentinel
 }
 

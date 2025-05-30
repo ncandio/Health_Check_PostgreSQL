@@ -2,6 +2,7 @@
 Main entry point for the SiteSentinel application.
 """
 
+import argparse
 import json
 import logging
 import os
@@ -238,8 +239,15 @@ def main():
     """Main entry point."""
     print("\033[97;44m SYSTEM STATUS \033[0m \033[1;96mStarting SiteSentinel\033[0m")
 
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="SiteSentinel - Website monitoring system")
+    parser.add_argument("--config", "-c", type=str, default="config.json",
+                      help="Path to configuration file (default: config.json)")
+    args = parser.parse_args()
+    
     # Load configuration
-    config = load_config()
+    config = load_config(args.config)
+    print(f"\033[97;44m CONFIG \033[0m \033[1;96mLoading configuration from {args.config}\033[0m")
 
     # Set up database
     db_manager = setup_database(config["database"])
