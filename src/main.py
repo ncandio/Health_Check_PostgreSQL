@@ -1,5 +1,5 @@
 """
-Main entry point for the website monitor application.
+Main entry point for the SiteSentinel application.
 """
 
 import json
@@ -46,7 +46,7 @@ logger.addHandler(main_file_handler)
 
 # Enhanced startup banner with better visibility
 print(f"\033[97;46m{'='*80}\033[0m")
-print(f"\033[97;46m WEBSITE MONITORING SYSTEM STARTING \033[0m")
+print(f"\033[97;46m SITESENTINEL STARTING \033[0m")
 print(f"\033[97;46m Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} \033[0m")
 print(
     f"\033[97;46m Python: {sys.version.split()[0]} | Host: {os.uname().nodename} \033[0m"
@@ -207,7 +207,7 @@ def configure_websites(
             configured_count += 1
             # Use bright green color ANSI escape sequence with white background and black text for better visibility
             print(
-                f"\033[97;42m WEBSITE CONFIGURED \033[0m \033[1;92m{website_config['url']}\033[0m"
+                f"\033[97;42m SITE CONFIGURED \033[0m \033[1;92m{website_config['url']}\033[0m"
             )
         except Exception as e:
             logger.error(f"Failed to configure website {website_config['url']}: {e}")
@@ -236,7 +236,7 @@ def setup_signal_handlers(scheduler: Scheduler, db_manager: DatabaseManager):
 
 def main():
     """Main entry point."""
-    print("\033[97;44m SYSTEM STATUS \033[0m \033[1;96mStarting website monitor\033[0m")
+    print("\033[97;44m SYSTEM STATUS \033[0m \033[1;96mStarting SiteSentinel\033[0m")
 
     # Load configuration
     config = load_config()
@@ -273,7 +273,7 @@ def main():
     # Configure websites
     configured_count = configure_websites(config, db_manager, monitor, scheduler)
     print(
-        f"\033[97;44m MONITOR STATUS \033[0m \033[1;96mConfigured {configured_count} websites\033[0m"
+        f"\033[97;44m SENTINEL STATUS \033[0m \033[1;96mConfigured {configured_count} websites\033[0m"
     )
 
     # Keep the main thread alive

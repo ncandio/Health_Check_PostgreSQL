@@ -1,4 +1,4 @@
--- SQL schema for website monitor with enhanced real-time monitoring capabilities
+-- SQL schema for SiteSentinel with enhanced real-time monitoring capabilities
 
 -- Table to store website configurations
 CREATE TABLE IF NOT EXISTS website_configs (

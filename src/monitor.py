@@ -19,7 +19,7 @@ log_dir = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
 )
 os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "website_monitor.log")
+log_file = os.path.join(log_dir, "sitesentinel.log")
 
 # Setup root logger
 root_logger = logging.getLogger()

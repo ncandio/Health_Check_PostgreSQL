@@ -1,6 +1,6 @@
 @echo off
 echo ====================================================
-echo   Website Monitor PostgreSQL Setup Helper (Windows)
+echo   SiteSentinel PostgreSQL Setup Helper (Windows)
 echo ====================================================
 echo.
 
@@ -23,7 +23,7 @@ echo --------------------------------------------------
 echo Would you like to set up the database with default credentials?
 echo This will:
 echo 1. Create a PostgreSQL user 'postgres' with password 'postgres'
-echo 2. Create a database 'website_monitor'
+echo 2. Create a database 'sitesentinel'
 echo 3. Configure the application to use these credentials
 echo.
 set /p answer="Proceed? (y/n): "
@@ -35,8 +35,8 @@ if /i "%answer%" NEQ "y" (
 )
 
 REM Create the database
-echo Creating 'website_monitor' database...
-psql -U postgres -c "CREATE DATABASE website_monitor;" 2>nul
+echo Creating 'sitesentinel' database...
+psql -U postgres -c "CREATE DATABASE sitesentinel;" 2>nul
 if %ERRORLEVEL% EQU 0 (
     echo Database created successfully.
 ) else (
@@ -45,7 +45,7 @@ if %ERRORLEVEL% EQU 0 (
 
 REM Verify the connection works
 echo Verifying database connection...
-psql -U postgres -d website_monitor -c "SELECT 1" >nul 2>&1
+psql -U postgres -d sitesentinel -c "SELECT 1" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo Database connection successful!
 ) else (
