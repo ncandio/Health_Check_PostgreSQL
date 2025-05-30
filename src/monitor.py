@@ -12,6 +12,7 @@ import time
 from typing import Any, Dict, Optional, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
 from requests.exceptions import RequestException
 
 # Enhanced logging setup with file rotation and console output
@@ -60,6 +61,19 @@ class WebsiteMonitor:
         """
         self.timeout = timeout
         self.retry_limit = retry_limit
+        # Create a session that will be reused for all requests
+        self.session = requests.Session()
+        # Configure session to close connections after each request
+        self.session.keep_alive = False
+        # Set a higher connection pool limit
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=100,  # Number of connection pools to keep
+            pool_maxsize=100,      # Number of connections per pool
+            max_retries=0,         # We handle retries ourselves
+            pool_block=False       # Don't block when pool is full
+        )
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
 
     def check_website(
         self, url: str, regex_pattern: Optional[str] = None
@@ -85,13 +99,17 @@ class WebsiteMonitor:
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
             "check_details": {},
         }
+        
+        # Track response object for proper cleanup in finally block
+        response = None
 
         for attempt in range(self.retry_limit):
             try:
                 logger.debug(f"Attempt {attempt + 1}/{self.retry_limit} for {url}")
 
                 start_time = time.time()
-                response = requests.get(url, timeout=self.timeout)
+                # Use session instead of direct requests to better manage connections
+                response = self.session.get(url, timeout=self.timeout)
                 end_time = time.time()
 
                 response_time_ms = (end_time - start_time) * 1000
@@ -116,6 +134,11 @@ class WebsiteMonitor:
                         # If not serializable, convert to string
                         headers_dict[k] = str(v)
                 result["check_details"]["headers"] = headers_dict
+                
+                # Explicitly close request connection to prevent file descriptor leaks
+                if hasattr(response, 'raw') and hasattr(response.raw, 'close'):
+                    response.raw.close()
+                response.close()
 
                 # Enhanced regex pattern logging with color coding
                 if regex_pattern and result["success"]:
@@ -154,24 +177,52 @@ class WebsiteMonitor:
                 if attempt == self.retry_limit - 1:  # Last attempt
                     result["failure_reason"] = f"Request failed: {str(e)}"
                     result["check_details"]["exception_type"] = e.__class__.__name__
+                # Clean up any partial response object
+                if response:
+                    try:
+                        response.close()
+                    except:
+                        pass
+                    response = None
             except Exception as e:
                 logger.error(
                     f"\033[91mUnexpected error checking {url}: {str(e)}\033[0m"
                 )
                 result["failure_reason"] = f"Unexpected error: {str(e)}"
                 result["check_details"]["exception_type"] = e.__class__.__name__
+                # Clean up any partial response object
+                if response:
+                    try:
+                        response.close()
+                    except:
+                        pass
+                    response = None
                 break
 
-        # Only log successful results with enhanced color-coded output
-        if result["success"]:
-            print(
-                f"\033[97;42m WEBSITE CHECK \033[0m \033[1;92m✓ SUCCESSFUL\033[0m \033[1;94m{url}\033[0m - "
-                f"Status: \033[1;96m{result['http_status']}\033[0m, "
-                f"Time: \033[1;93m{result['response_time_ms']:.2f}ms\033[0m, "
-                f"Regex Match: \033[1;92m{result['regex_matched']}\033[0m"
-            )
+        try:
+            # Only log successful results with enhanced color-coded output
+            if result["success"]:
+                print(
+                    f"\033[97;42m WEBSITE CHECK \033[0m \033[1;92m✓ SUCCESSFUL\033[0m \033[1;94m{url}\033[0m - "
+                    f"Status: \033[1;96m{result['http_status']}\033[0m, "
+                    f"Time: \033[1;93m{result['response_time_ms']:.2f}ms\033[0m, "
+                    f"Regex Match: \033[1;92m{result['regex_matched']}\033[0m"
+                )
 
-        # Log detailed result JSON for debugging and monitoring
-        logger.debug(f"Detailed check result for {url}: {result}")
+            # Log detailed result JSON for debugging and monitoring
+            logger.debug(f"Detailed check result for {url}: {result}")
 
-        return result
+            return result
+        finally:
+            # Final cleanup of response to ensure resources are released
+            if response:
+                try:
+                    if hasattr(response, 'raw') and hasattr(response.raw, 'close'):
+                        response.raw.close()
+                    response.close()
+                except Exception as e:
+                    logger.warning(f"Error closing response for {url}: {e}")
+            
+            # Force garbage collection for this function
+            import gc
+            gc.collect()

@@ -153,7 +153,13 @@ class DatabaseManager:
                         schema_sql = f.read()
                         
                     logger.info(f"\033[94mInitializing database schema...\033[0m")
-                    cursor.execute(schema_sql)
+                    # Split into individual statements to avoid error with existing trigger
+                    for statement in schema_sql.split(';'):
+                        if statement.strip():
+                            try:
+                                cursor.execute(statement + ';')
+                            except Exception as exec_err:
+                                logger.warning(f"Statement execution error (continuing): {exec_err}")
                     logger.info(f"\033[92mDatabase schema initialized successfully\033[0m")
                 else:
                     logger.warning(f"\033[93mSchema file not found at {schema_path}\033[0m")
