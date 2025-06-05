@@ -154,10 +154,46 @@ class DatabaseManager:
                         
                     logger.info(f"\033[94mInitializing database schema...\033[0m")
                     # Split into individual statements to avoid error with existing trigger
-                    for statement in schema_sql.split(';'):
+                    statements = []
+                    current_statement = ""
+                    in_dollar_quote = False
+                    dollar_quote_tag = ""
+                    
+                    for line in schema_sql.split('\n'):
+                        # Check for beginning or end of dollar-quoted string
+                        if not in_dollar_quote:
+                            # Look for dollar quote start
+                            if '$$' in line:
+                                in_dollar_quote = True
+                                dollar_quote_tag = '$$'
+                                current_statement += line + '\n'
+                                continue
+                        else:
+                            # Look for matching dollar quote end
+                            if dollar_quote_tag in line:
+                                in_dollar_quote = False
+                                dollar_quote_tag = ""
+                            current_statement += line + '\n'
+                            continue
+                        
+                        # Handle normal line
+                        if ';' in line and not in_dollar_quote:
+                            # Found statement end
+                            current_statement += line
+                            statements.append(current_statement)
+                            current_statement = ""
+                        else:
+                            current_statement += line + '\n'
+                    
+                    # Add the last statement if any
+                    if current_statement.strip():
+                        statements.append(current_statement)
+                    
+                    # Execute each statement
+                    for statement in statements:
                         if statement.strip():
                             try:
-                                cursor.execute(statement + ';')
+                                cursor.execute(statement)
                             except Exception as exec_err:
                                 logger.warning(f"Statement execution error (continuing): {exec_err}")
                     logger.info(f"\033[92mDatabase schema initialized successfully\033[0m")

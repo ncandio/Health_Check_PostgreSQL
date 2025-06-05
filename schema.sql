@@ -47,9 +47,10 @@ BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
 -- Trigger to update the updated_at column
+DROP TRIGGER IF EXISTS update_website_configs_updated_at ON website_configs;
 CREATE TRIGGER update_website_configs_updated_at
 BEFORE UPDATE ON website_configs
 FOR EACH ROW
