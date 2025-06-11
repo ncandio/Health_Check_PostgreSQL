@@ -39,7 +39,7 @@ The application consists of several modular components:
   - When Dask is enabled, a dashboard URL will be displayed at startup for monitoring tasks (typically at http://localhost:8787)
   - The Dask console is available at http://localhost:8787 and the URL is logged at 10-second intervals for easy access
 - Configuration supports 1000 websites with regex pattern matching
-- Comprehensive test suite for scheduler, database, and website monitoring
+- Comprehensive test suite for scheduler, database, and website monitoring at different scales
 - Connects to a PostgreSQL database (configured in config.json)
 
 ## Installation
@@ -231,6 +231,68 @@ For monitoring a large number of websites, the application supports Dask distrib
 2. Adjust the number of workers: `"max_workers": 50`
 
 When Dask is enabled, the application will display a link to the Dask dashboard for real-time monitoring of task execution.
+
+## Testing
+
+SiteSentinel includes a comprehensive test suite that verifies functionality at different scales:
+
+### Scale Testing
+
+A battery of tests validates the system's performance and reliability with increasing workloads:
+
+- **10 Websites Test**: Basic functionality test with 10 popular websites
+  ```bash
+  python -m unittest test.test_10_websites
+  ```
+
+- **100 Websites Test**: Medium-scale test with 100 dynamically generated domains
+  ```bash
+  python -m unittest test.test_100_websites
+  ```
+
+- **500 Websites Test**: Large-scale test with 500 domains from external source
+  ```bash
+  python -m unittest test.test_500_websites
+  ```
+
+- **1000 Websites Test**: High-load test with 1000 randomly generated domains
+  ```bash
+  python -m unittest test.test_1000_websites
+  ```
+
+- **10000 Websites Test**: Extreme-scale stress test with 10000 domains
+  ```bash
+  python -m unittest test.test_10000_websites
+  ```
+
+### Component Testing
+
+Unit tests for individual components ensure reliability:
+
+- **Database Tests**: Validates database operations and connection pooling
+  ```bash
+  python -m unittest test.test_database
+  ```
+
+- **Scheduler Tests**: Verifies task scheduling and execution in both thread and Dask modes
+  ```bash
+  python -m unittest test.test_scheduler
+  ```
+
+- **Website Regex Tests**: Tests content validation patterns
+  ```bash
+  python -m unittest test.test_website_regex
+  ```
+
+### Running All Tests
+
+To run the complete test suite:
+
+```bash
+python -m unittest discover -s test
+```
+
+For performance reasons, you may want to run the larger scale tests individually.
 
 ## Project Structure
 
